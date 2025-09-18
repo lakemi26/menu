@@ -1,103 +1,129 @@
-import Image from "next/image";
+// app/menu/page.tsx
+import { adminDb } from "@/app/firebase/admin";
+import ProductArea from "@/components/product/productArea";
+import type { Product } from "@/components/menu/types";
 
-export default function Home() {
+export const runtime = "nodejs";
+export const revalidate = 0;
+
+type CategoryDoc = {
+  id: string;
+  name: string;
+  slug: string;
+  order?: number | null;
+};
+
+const ORDERED_SLUGS = [
+  "entradas",
+  "pizza-broto",
+  "pizzas",
+  "pizzas-doces-broto",
+  "pizzas-doces",
+  "bebidas",
+  "outros",
+] as const;
+
+export default async function MenuPage() {
+  // categorias
+  const catSnap = await adminDb.collection("categories").get();
+  const categories = catSnap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<CategoryDoc, "id">),
+  })) as CategoryDoc[];
+
+  const slugToCat = new Map(categories.map((c) => [c.slug, c]));
+
+  // produtos
+  const prodSnap = await adminDb
+    .collection("products")
+    .orderBy("createdAt", "desc")
+    .get();
+
+  const products = prodSnap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<Product, "id">),
+  })) as Product[];
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="space-y-12 mt-6">
+      {ORDERED_SLUGS.map((slug) => {
+        const cat = slugToCat.get(slug);
+        const catId = cat?.id ?? null;
+        const list = products.filter(
+          (p) => (p.categoryId ?? null) === (catId ?? null)
+        );
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        if (list.length === 0) return null;
+
+        return (
+          <ProductArea key={slug} title={cat?.name ?? slug} products={list} />
+        );
+      })}
     </div>
   );
 }
+
+// Para sessões separadas com componentes diferentes
+
+// app/menu/page.tsx
+// import { adminDb } from "@/app/firebase/admin";
+// import ProductArea from "@/components/product/productArea";
+// import PizzaSalgadaSection from "@/components/menu/PizzaSalgadaSection";
+// import PizzaDoceSection from "@/components/menu/PizzaDoceSection";
+// import type { Product } from "@/components/menu/types";
+
+// export const runtime = "nodejs";
+// export const revalidate = 0;
+
+// type CategoryDoc = {
+//   id: string;
+//   name: string;
+//   slug: string;
+// };
+
+// export default async function MenuPage() {
+//   // categorias
+//   const catSnap = await adminDb.collection("categories").get();
+//   const categories = catSnap.docs.map((d) => ({
+//     id: d.id,
+//     ...(d.data() as Omit<CategoryDoc, "id">),
+//   })) as CategoryDoc[];
+
+//   const slugToCat = new Map(categories.map((c) => [c.slug, c]));
+
+//   // produtos
+//   const prodSnap = await adminDb
+//     .collection("products")
+//     .orderBy("createdAt", "desc")
+//     .get();
+
+//   const products = prodSnap.docs.map((d) => ({
+//     id: d.id,
+//     ...(d.data() as Omit<Product, "id">),
+//   })) as Product[];
+
+//   // pega categorias específicas
+//   const pizzasSalgadasId = slugToCat.get("pizzas")?.id ?? null;
+//   const pizzasDocesId = slugToCat.get("pizzas-doces")?.id ?? null;
+
+//   const pizzasSalgadas = products.filter((p) => p.categoryId === pizzasSalgadasId);
+//   const pizzasDoces = products.filter((p) => p.categoryId === pizzasDocesId);
+
+//   return (
+//     <div className="space-y-12 mt-6">
+//       {pizzasSalgadas.length > 0 && (
+//         <PizzaSalgadaSection products={pizzasSalgadas} />
+//       )}
+
+//       {pizzasDoces.length > 0 && (
+//         <PizzaDoceSection products={pizzasDoces} />
+//       )}
+
+//       {/* outras categorias podem continuar com ProductArea normal */}
+//       <ProductArea
+//         title="Bebidas"
+//         products={products.filter((p) => p.categoryId === slugToCat.get("bebidas")?.id)}
+//       />
+//     </div>
+//   );
+// }
